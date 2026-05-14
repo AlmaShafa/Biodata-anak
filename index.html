@@ -16,8 +16,6 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
   <!-- jsPDF -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<!-- jsPDF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <!-- Firebase -->
@@ -58,6 +56,7 @@ window.firebaseDeleteDoc = deleteDoc;
 window.firebaseDoc = doc;
 
 </script>
+
   <!-- html2canvas -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
@@ -125,11 +124,11 @@ window.firebaseDoc = doc;
     }
 
     .line-clamp-2{
-      display:-webkit-box;
-      -webkit-line-clamp:2;
-      -webkit-box-orient:vertical;
-      overflow:hidden;
-    }
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+}
   </style>
 </head>
 
@@ -449,6 +448,7 @@ function handleExcel(e){
     biodata = json;
 
     localStorage.setItem("biodata-anak", JSON.stringify(biodata));
+    saveToFirebase(biodata);
 
     populateKelas();
 
@@ -881,6 +881,71 @@ function downloadTemplate(){
 
 }
 
+// ======================
+// FIREBASE SAVE
+// ======================
+
+async function saveToFirebase(dataArray){
+
+  const snapshot = await firebaseGetDocs(
+    firebaseCollection(db,"biodata_anak")
+  );
+
+  const oldDocs = [];
+
+  snapshot.forEach((d)=>{
+    oldDocs.push({
+      id:d.id
+    });
+  });
+
+  for(const item of oldDocs){
+
+    await firebaseDeleteDoc(
+      firebaseDoc(db,"biodata_anak",item.id)
+    );
+
+  }
+
+  for(const item of dataArray){
+
+    await firebaseAddDoc(
+      firebaseCollection(db,"biodata_anak"),
+      item
+    );
+
+  }
+
+}
+
+
+// ======================
+// LOAD DATA FIREBASE
+// ======================
+
+async function loadFirebaseData(){
+
+  const snapshot = await firebaseGetDocs(
+    firebaseCollection(db,"biodata_anak")
+  );
+
+  biodata = [];
+
+  snapshot.forEach((doc)=>{
+
+    biodata.push(doc.data());
+
+  });
+
+  renderCards(biodata);
+
+  updateStats();
+
+  populateKelas();
+
+}
+
+loadFirebaseData();
 </script>
 
 </body>
