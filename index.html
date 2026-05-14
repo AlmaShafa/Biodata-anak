@@ -1,44 +1,40 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" class="scroll-smooth">
 <head>
-    <meta charset="UTF-8">
-    <title>Database Anak Online (Firebase)</title>
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-storage-compat.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <style>
-        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
-        .container { max-width: 1000px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .status-online { color: green; font-weight: bold; margin-bottom: 15px; display: block; }
-        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
-        .card { border: 1px solid #ddd; padding: 10px; border-radius: 8px; text-align: center; background: #fff; }
-        .card img { width: 100%; height: 150px; object-fit: cover; border-radius: 5px; }
-        .loading { display: none; color: blue; }
-    </style>
-</head>
-<body>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Database Biodata Anak</title>
 
-<div class="container">
-    <h2>Sistem Biodata Anak (Online Sync)</h2>
-    <span class="status-online">● Terhubung ke Cloud Database</span>
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Nunito:wght@400;600;700;800&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-    <div style="background: #e9ecef; padding: 15px; border-radius: 8px;">
-        <strong>Panel Admin:</strong><br><br>
-        1. Upload Excel: <input type="file" id="excelInput"><br><br>
-        2. Upload Foto: <input type="file" id="photoInput" multiple>
-        <p id="progressText" class="loading">Sedang mengunggah ke awan...</p>
-    </div>
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-    <div class="card-grid" id="dataDisplay">
-        <!-- Data dari Firebase akan muncul di sini -->
-    </div>
-</div>
+  <!-- SheetJS -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
-<script>
-    // MASUKKAN CONFIG FIREBASE ANDA DI SINI
-    const firebaseConfig = {
+  <!-- jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- jsPDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<!-- Firebase -->
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  deleteDoc,
+  doc
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
   apiKey: "AIzaSyB58h8StLIIcJ-nU_vbF2D2FiJEeE1dpUA",
   authDomain: "data-kafalah.firebaseapp.com",
   projectId: "data-kafalah",
@@ -46,75 +42,845 @@
   messagingSenderId: "30933873639",
   appId: "1:30933873639:web:0bdbe53011dd58dc6e4342",
   measurementId: "G-9TSK2QYBPV"
-    };
 
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    const storage = firebase.storage();
+};
 
-    // 1. Fungsi Baca & Simpan Excel ke Online Firestore
-    document.getElementById('excelInput').addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        const reader = new FileReader();
-        reader.onload = async (evt) => {
-            const data = new Uint8Array(evt.target.result);
-            const workbook = XLSX.read(data, {type: 'array'});
-            const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+const app = initializeApp(firebaseConfig);
 
-            document.getElementById('progressText').style.display = 'block';
-            
-            for(let item of json) {
-                const nama = item['Nama Lengkap'];
-                await db.collection("anak").doc(nama).set({
-                    ...item,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                }, { merge: true });
-            }
-            alert("Data Excel berhasil disinkronkan ke Cloud!");
-            document.getElementById('progressText').style.display = 'none';
-        };
-        reader.readAsArrayBuffer(file);
-    });
+const db = getFirestore(app);
 
-    // 2. Fungsi Upload Foto ke Cloud Storage
-    document.getElementById('photoInput').addEventListener('change', async (e) => {
-        const files = Array.from(e.target.files);
-        document.getElementById('progressText').style.display = 'block';
+window.db = db;
 
-        for(let file of files) {
-            const namaAnak = file.name.split('.')[0];
-            const storageRef = storage.ref(`foto_anak/${file.name}`);
-            
-            // Upload file
-            await storageRef.put(file);
-            // Ambil URL-nya
-            const downloadURL = await storageRef.getDownloadURL();
-            
-            // Update link foto di database Firestore
-            await db.collection("anak").doc(namaAnak).update({
-                fotoUrl: downloadURL
-            });
-        }
-        alert("Semua foto berhasil terupload!");
-        document.getElementById('progressText').style.display = 'none';
-    });
+window.firebaseCollection = collection;
+window.firebaseAddDoc = addDoc;
+window.firebaseGetDocs = getDocs;
+window.firebaseDeleteDoc = deleteDoc;
+window.firebaseDoc = doc;
 
-    // 3. Realtime Listener (Data otomatis update tanpa refresh)
-    db.collection("anak").orderBy("timestamp", "desc").onSnapshot((querySnapshot) => {
-        const display = document.getElementById('dataDisplay');
-        display.innerHTML = "";
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            display.innerHTML += `
-                <div class="card">
-                    <img src="${data.fotoUrl || 'https://via.placeholder.com/150'}">
-                    <h4>${doc.id}</h4>
-                    <p>${data['Kota'] || '-'}</p>
-                </div>
-            `;
-        });
-    });
+</script>
+  <!-- html2canvas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <!-- Lucide -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    body{
+      font-family:'Inter',sans-serif;
+      background:#f8fafc;
+    }
+
+    .arabic{
+      font-family:"Traditional Arabic", serif;
+    }
+
+    .glass{
+      background: rgba(255,255,255,0.7);
+      backdrop-filter: blur(10px);
+    }
+
+    .card-hover{
+      transition: all .3s ease;
+    }
+
+    .card-hover:hover{
+      transform: translateY(-6px);
+      box-shadow:0 20px 40px rgba(0,0,0,.08);
+    }
+
+    .dark body{
+      background:#0f172a;
+      color:white;
+    }
+
+    .skeleton{
+      animation:pulse 1.5s infinite;
+      background:linear-gradient(
+        90deg,
+        #f1f5f9 25%,
+        #e2e8f0 50%,
+        #f1f5f9 75%
+      );
+      background-size:200% 100%;
+    }
+
+    @keyframes pulse{
+      0%{background-position:200% 0}
+      100%{background-position:-200% 0}
+    }
+
+    .fade-in{
+      animation:fade .4s ease;
+    }
+
+    @keyframes fade{
+      from{
+        opacity:0;
+        transform:translateY(10px);
+      }
+      to{
+        opacity:1;
+        transform:translateY(0);
+      }
+    }
+
+    .line-clamp-2{
+      display:-webkit-box;
+      -webkit-line-clamp:2;
+      -webkit-box-orient:vertical;
+      overflow:hidden;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen">
+
+<!-- HEADER -->
+<header class="bg-gradient-to-r from-orange-400 via-amber-300 to-emerald-400 shadow-xl">
+  <div class="max-w-7xl mx-auto px-4 py-5">
+
+    <div class="flex items-center justify-between gap-4">
+
+      <!-- Logo Left -->
+      <div class="w-16 h-16 bg-white rounded-2xl shadow-lg flex items-center justify-center overflow-hidden">
+        <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" class="w-12">
+      </div>
+
+      <!-- Title -->
+      <div class="text-center text-white">
+        <h1 class="text-3xl md:text-4xl font-extrabold font-[Poppins]">
+          Database Biodata Anak
+        </h1>
+        <p class="text-sm md:text-base opacity-90">
+          Sistem Digital Pengelolaan Data Anak
+        </p>
+      </div>
+
+      <!-- Logo Right -->
+      <div class="w-16 h-16 bg-white rounded-2xl shadow-lg flex items-center justify-center overflow-hidden">
+        <img src="https://cdn-icons-png.flaticon.com/512/3062/3062634.png" class="w-12">
+      </div>
+
+    </div>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="relative overflow-hidden">
+  <div class="max-w-7xl mx-auto px-4 py-14">
+
+    <div class="grid lg:grid-cols-2 gap-10 items-center">
+
+      <div>
+        <span class="bg-orange-100 text-orange-700 px-4 py-2 rounded-full text-sm font-semibold">
+          Premium Dashboard
+        </span>
+
+        <h2 class="mt-6 text-5xl font-black leading-tight font-[Poppins] text-slate-800">
+          Database Biodata Anak
+        </h2>
+
+        <p class="mt-5 text-slate-600 text-lg leading-relaxed">
+          Sistem digital modern untuk pengelolaan data anak lengkap
+          dengan foto, identitas, pendidikan, dan informasi keluarga.
+        </p>
+
+        <div class="flex flex-wrap gap-4 mt-8">
+
+          <label class="cursor-pointer bg-emerald-500 hover:bg-emerald-600 transition text-white px-6 py-4 rounded-2xl shadow-xl font-semibold flex items-center gap-2">
+            <i data-lucide="upload"></i>
+            Upload Excel
+            <input type="file" id="excelFile" class="hidden" accept=".xlsx,.csv">
+          </label>
+
+          <label class="cursor-pointer bg-orange-500 hover:bg-orange-600 transition text-white px-6 py-4 rounded-2xl shadow-xl font-semibold flex items-center gap-2">
+            <i data-lucide="images"></i>
+            Upload Foto
+            <input type="file" id="photoFiles" class="hidden" multiple accept="image/*">
+          </label>
+
+          <button onclick="downloadTemplate()"
+            class="bg-white border border-slate-200 px-6 py-4 rounded-2xl font-semibold shadow hover:shadow-lg transition">
+            Download Template
+          </button>
+
+        </div>
+      </div>
+
+      <!-- HERO CARD -->
+      <div class="glass rounded-[32px] p-8 shadow-2xl border border-white/40">
+
+        <div class="grid grid-cols-2 gap-5">
+
+          <div class="bg-white rounded-3xl p-6 shadow">
+            <div class="flex justify-between">
+              <div>
+                <p class="text-slate-500 text-sm">Total Anak</p>
+                <h3 id="totalAnak" class="text-4xl font-black mt-2 text-slate-800">0</h3>
+              </div>
+              <div class="w-14 h-14 rounded-2xl bg-orange-100 flex items-center justify-center">
+                <i data-lucide="users" class="text-orange-500"></i>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-3xl p-6 shadow">
+            <div class="flex justify-between">
+              <div>
+                <p class="text-slate-500 text-sm">Perempuan</p>
+                <h3 id="totalPerempuan" class="text-4xl font-black mt-2 text-pink-500">0</h3>
+              </div>
+              <div class="w-14 h-14 rounded-2xl bg-pink-100 flex items-center justify-center">
+                <i data-lucide="heart"></i>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-3xl p-6 shadow">
+            <div class="flex justify-between">
+              <div>
+                <p class="text-slate-500 text-sm">Laki-laki</p>
+                <h3 id="totalLaki" class="text-4xl font-black mt-2 text-blue-500">0</h3>
+              </div>
+              <div class="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center">
+                <i data-lucide="shield"></i>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-3xl p-6 shadow">
+            <div class="flex justify-between">
+              <div>
+                <p class="text-slate-500 text-sm">Kelas</p>
+                <h3 id="totalKelas" class="text-4xl font-black mt-2 text-emerald-500">0</h3>
+              </div>
+              <div class="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center">
+                <i data-lucide="graduation-cap"></i>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+</section>
+
+<!-- SEARCH -->
+<section class="max-w-7xl mx-auto px-4">
+
+  <div class="glass rounded-3xl p-6 shadow-xl border border-white/30">
+
+    <div class="grid md:grid-cols-4 gap-4">
+
+      <input id="searchInput"
+        type="text"
+        placeholder="Cari nama / nomor induk..."
+        class="px-5 py-4 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-400">
+
+      <select id="filterKelas"
+        class="px-5 py-4 rounded-2xl border border-slate-200">
+        <option value="">Semua Kelas</option>
+      </select>
+
+      <select id="filterJK"
+        class="px-5 py-4 rounded-2xl border border-slate-200">
+        <option value="">Semua Gender</option>
+        <option value="L">Laki-laki</option>
+        <option value="P">Perempuan</option>
+      </select>
+
+      <button onclick="toggleDarkMode()"
+        class="bg-slate-900 text-white rounded-2xl font-semibold">
+        Toggle Dark Mode
+      </button>
+
+    </div>
+
+  </div>
+
+</section>
+
+<!-- GRID -->
+<section class="max-w-7xl mx-auto px-4 py-10">
+
+  <div id="loadingGrid" class="hidden grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+  </div>
+
+  <div id="cardContainer"
+    class="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+  </div>
+
+</section>
+
+<!-- MODAL -->
+<div id="detailModal"
+  class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+
+  <div class="bg-white rounded-[32px] max-w-4xl w-full max-h-[95vh] overflow-auto shadow-2xl">
+
+    <div id="modalContent"></div>
+
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<footer class="bg-slate-900 text-white mt-20">
+
+  <div class="max-w-7xl mx-auto px-4 py-10">
+
+    <div class="grid md:grid-cols-3 gap-8">
+
+      <div>
+        <h3 class="font-bold text-2xl font-[Poppins]">
+          Yayasan Pendidikan Anak
+        </h3>
+        <p class="text-slate-300 mt-3">
+          Sistem digital modern pengelolaan biodata anak dan administrasi lembaga sosial.
+        </p>
+      </div>
+
+      <div>
+        <h4 class="font-bold mb-3">Kontak</h4>
+        <p>Email : admin@yatimdigital.com</p>
+        <p>WhatsApp : 0812-3456-7890</p>
+      </div>
+
+      <div>
+        <h4 class="font-bold mb-3">Sosial Media</h4>
+        <div class="flex gap-3">
+          <div class="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center">
+            <i data-lucide="instagram"></i>
+          </div>
+
+          <div class="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center">
+            <i data-lucide="facebook"></i>
+          </div>
+
+          <div class="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center">
+            <i data-lucide="youtube"></i>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="border-t border-white/10 mt-8 pt-6 text-center text-slate-400">
+      © 2026 Biodata Anak Digital. All Rights Reserved.
+    </div>
+
+  </div>
+
+</footer>
+
+<script>
+
+lucide.createIcons();
+
+let biodata = JSON.parse(localStorage.getItem("biodata-anak")) || [];
+let photoMap = {};
+
+const cardContainer = document.getElementById("cardContainer");
+
+renderCards(biodata);
+updateStats();
+
+
+// ======================
+// Upload Foto
+// ======================
+
+document.getElementById("photoFiles")
+.addEventListener("change", function(e){
+
+  const files = e.target.files;
+
+  for(let file of files){
+
+    const reader = new FileReader();
+
+    reader.onload = function(event){
+
+      const fileName = file.name.split(".")[0].toLowerCase();
+
+      photoMap[fileName] = event.target.result;
+
+      localStorage.setItem("photoMap", JSON.stringify(photoMap));
+
+      renderCards(biodata);
+
+    }
+
+    reader.readAsDataURL(file);
+  }
+
+});
+
+photoMap = JSON.parse(localStorage.getItem("photoMap")) || {};
+
+
+// ======================
+// Upload Excel
+// ======================
+
+document.getElementById("excelFile")
+.addEventListener("change", handleExcel);
+
+function handleExcel(e){
+
+  const file = e.target.files[0];
+
+  const reader = new FileReader();
+
+  reader.onload = function(evt){
+
+    const data = new Uint8Array(evt.target.result);
+
+    const workbook = XLSX.read(data, {type:'array'});
+
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+    const json = XLSX.utils.sheet_to_json(sheet);
+
+    biodata = json;
+
+    localStorage.setItem("biodata-anak", JSON.stringify(biodata));
+
+    populateKelas();
+
+    renderCards(biodata);
+
+    updateStats();
+
+  }
+
+  reader.readAsArrayBuffer(file);
+
+}
+
+
+// ======================
+// Render Cards
+// ======================
+
+function renderCards(data){
+
+  cardContainer.innerHTML = "";
+
+  if(data.length === 0){
+
+    cardContainer.innerHTML = `
+      <div class="col-span-full text-center py-20">
+        <h3 class="text-3xl font-bold text-slate-400">
+          Belum ada data biodata
+        </h3>
+      </div>
+    `;
+
+    return;
+  }
+
+  data.forEach((item,index)=>{
+
+    const namaFoto =
+      item.nomor_induk?.toLowerCase() ||
+      item.nama?.toLowerCase();
+
+    const foto =
+      photoMap[namaFoto] ||
+      "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
+
+    cardContainer.innerHTML += `
+
+      <div class="glass card-hover fade-in rounded-[32px] p-6 shadow-xl border border-white/40">
+
+        <div class="flex flex-col items-center text-center">
+
+          <img src="${foto}"
+            class="w-28 h-28 rounded-full object-cover border-4 border-white shadow-lg">
+
+          <h3 class="mt-5 text-xl font-bold text-slate-800">
+            ${item.nama || '-'}
+          </h3>
+
+          <p class="text-slate-500">
+            ${item.nomor_induk || '-'}
+          </p>
+
+          <div class="flex gap-2 mt-4 flex-wrap justify-center">
+
+            <span class="px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-xs font-semibold">
+              ${item.kelas || '-'}
+            </span>
+
+            <span class="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
+              ${item.jk || '-'}
+            </span>
+
+          </div>
+
+          <div class="mt-5 w-full space-y-2 text-left">
+
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-500">Wali</span>
+              <span class="font-medium">${item.wali || '-'}</span>
+            </div>
+
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-500">Alamat</span>
+              <span class="font-medium line-clamp-2">
+                ${item.alamat || '-'}
+              </span>
+            </div>
+
+          </div>
+
+          <div class="grid grid-cols-3 gap-2 mt-6 w-full">
+
+            <button onclick="showDetail(${index})"
+              class="col-span-2 bg-slate-900 hover:bg-black transition text-white py-3 rounded-2xl font-semibold">
+              Detail
+            </button>
+
+            <button onclick="downloadPDF(${index})"
+              class="bg-orange-500 hover:bg-orange-600 transition text-white rounded-2xl">
+              PDF
+            </button>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    `;
+
+  });
+
+}
+
+
+// ======================
+// Detail Modal
+// ======================
+
+function showDetail(index){
+
+  const item = biodata[index];
+
+  const namaFoto =
+    item.nomor_induk?.toLowerCase() ||
+    item.nama?.toLowerCase();
+
+  const foto =
+    photoMap[namaFoto] ||
+    "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
+
+  detailModal.classList.remove("hidden");
+  detailModal.classList.add("flex");
+
+  modalContent.innerHTML = `
+
+    <div id="pdfContent" class="p-8">
+
+      <div class="flex justify-between items-start">
+
+        <div>
+          <h2 class="text-4xl font-black text-slate-800 font-[Poppins]">
+            Biodata Anak
+          </h2>
+
+          <p class="text-slate-500 mt-2">
+            Detail lengkap data anak
+          </p>
+        </div>
+
+        <button onclick="closeModal()"
+          class="w-12 h-12 rounded-2xl bg-slate-100 hover:bg-slate-200">
+          ✕
+        </button>
+
+      </div>
+
+      <div class="grid lg:grid-cols-3 gap-8 mt-10">
+
+        <div class="text-center">
+
+          <img src="${foto}"
+            class="w-52 h-52 rounded-full object-cover mx-auto shadow-xl border-8 border-white">
+
+          <h3 class="text-3xl font-bold mt-5">
+            ${item.nama || '-'}
+          </h3>
+
+          <p class="text-slate-500 mt-2">
+            ${item.nomor_induk || '-'}
+          </p>
+
+        </div>
+
+        <div class="lg:col-span-2 space-y-8">
+
+          ${detailSection("البيانات التعريفية والشخصية",[
+            ["Nama Lengkap", item.nama],
+            ["Jenis Kelamin", item.jk],
+            ["TTL", item.ttl],
+            ["Kesehatan", item.kesehatan],
+          ])}
+
+          ${detailSection("العنوان والسكن",[
+            ["Alamat", item.alamat],
+            ["Kota", item.kota],
+            ["Status Rumah", item.status_rumah],
+            ["Kondisi Rumah", item.kondisi_rumah],
+          ])}
+
+          ${detailSection("الحالة العائلية والاجتماعية",[
+            ["Nama Ayah", item.nama_ayah],
+            ["Nama Wali", item.wali],
+            ["Status Yatim", item.status_yatim],
+            ["Ekonomi", item.ekonomi],
+          ])}
+
+          ${detailSection("المسار التعليمي",[
+            ["Sekolah", item.sekolah],
+            ["Kelas", item.kelas],
+            ["Prestasi", item.prestasi],
+            ["Hafalan", item.hafalan],
+          ])}
+
+        </div>
+
+      </div>
+
+      <div class="flex gap-4 mt-10">
+
+        <button onclick="downloadCurrentPDF()"
+          class="bg-orange-500 text-white px-6 py-4 rounded-2xl font-semibold">
+          Download PDF
+        </button>
+
+        <button onclick="window.print()"
+          class="bg-slate-900 text-white px-6 py-4 rounded-2xl font-semibold">
+          Print
+        </button>
+
+      </div>
+
+    </div>
+
+  `;
+}
+
+function detailSection(title,data){
+
+  return `
+    <div class="bg-slate-50 rounded-3xl p-6">
+
+      <h3 class="arabic text-3xl font-bold text-emerald-700 mb-5">
+        ${title}
+      </h3>
+
+      <div class="grid md:grid-cols-2 gap-4">
+
+        ${data.map(i=>`
+          <div class="bg-white rounded-2xl p-4">
+            <div class="text-sm text-slate-500">${i[0]}</div>
+            <div class="font-semibold mt-1">${i[1] || '-'}</div>
+          </div>
+        `).join("")}
+
+      </div>
+
+    </div>
+  `;
+}
+
+function closeModal(){
+
+  detailModal.classList.add("hidden");
+  detailModal.classList.remove("flex");
+
+}
+
+
+// ======================
+// Search & Filter
+// ======================
+
+searchInput.addEventListener("input",filterData);
+filterKelas.addEventListener("change",filterData);
+filterJK.addEventListener("change",filterData);
+
+function filterData(){
+
+  const search = searchInput.value.toLowerCase();
+  const kelas = filterKelas.value;
+  const jk = filterJK.value;
+
+  const filtered = biodata.filter(item=>{
+
+    const cocokSearch =
+      (item.nama || '').toLowerCase().includes(search) ||
+      (item.nomor_induk || '').toLowerCase().includes(search);
+
+    const cocokKelas =
+      kelas === "" || item.kelas === kelas;
+
+    const cocokJK =
+      jk === "" || item.jk === jk;
+
+    return cocokSearch && cocokKelas && cocokJK;
+
+  });
+
+  renderCards(filtered);
+
+}
+
+
+// ======================
+// Populate Kelas
+// ======================
+
+function populateKelas(){
+
+  const kelasSet = [...new Set(
+    biodata.map(i=>i.kelas).filter(Boolean)
+  )];
+
+  filterKelas.innerHTML = `
+    <option value="">Semua Kelas</option>
+  `;
+
+  kelasSet.forEach(k=>{
+
+    filterKelas.innerHTML += `
+      <option value="${k}">
+        ${k}
+      </option>
+    `;
+
+  });
+
+}
+
+populateKelas();
+
+
+// ======================
+// Statistik
+// ======================
+
+function updateStats(){
+
+  totalAnak.innerText = biodata.length;
+
+  totalLaki.innerText =
+    biodata.filter(i=>i.jk==="L").length;
+
+  totalPerempuan.innerText =
+    biodata.filter(i=>i.jk==="P").length;
+
+  totalKelas.innerText =
+    [...new Set(biodata.map(i=>i.kelas))].length;
+
+}
+
+
+// ======================
+// Dark Mode
+// ======================
+
+function toggleDarkMode(){
+
+  document.documentElement.classList.toggle("dark");
+
+}
+
+
+// ======================
+// PDF
+// ======================
+
+async function downloadCurrentPDF(){
+
+  const element = document.getElementById("pdfContent");
+
+  const canvas = await html2canvas(element,{
+    scale:2
+  });
+
+  const imgData = canvas.toDataURL("image/png");
+
+  const { jsPDF } = window.jspdf;
+
+  const pdf = new jsPDF("p","mm","a4");
+
+  const width = pdf.internal.pageSize.getWidth();
+
+  const height =
+    (canvas.height * width) / canvas.width;
+
+  pdf.addImage(imgData,"PNG",0,0,width,height);
+
+  pdf.save("biodata-anak.pdf");
+
+}
+
+function downloadPDF(index){
+
+  showDetail(index);
+
+  setTimeout(()=>{
+    downloadCurrentPDF();
+  },500);
+
+}
+
+
+// ======================
+// Download Template
+// ======================
+
+function downloadTemplate(){
+
+  const data = [
+    {
+      nomor_induk:"001",
+      nama:"Ahmad Fauzi",
+      ttl:"Bandung, 10 Januari 2012",
+      jk:"L",
+      alamat:"Bandung",
+      wali:"Ibu Siti",
+      kelas:"5 SD",
+      hafalan:"Juz 30"
+    }
+  ];
+
+  const worksheet =
+    XLSX.utils.json_to_sheet(data);
+
+  const workbook =
+    XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    worksheet,
+    "Template"
+  );
+
+  XLSX.writeFile(
+    workbook,
+    "template_biodata.xlsx"
+  );
+
+}
+
 </script>
 
 </body>
