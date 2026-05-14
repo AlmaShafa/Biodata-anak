@@ -215,6 +215,22 @@ const cardContainer = document.getElementById('cardContainer');
 const searchInput = document.getElementById('searchInput');
 const filterKelas = document.getElementById('filterKelas');
 
+// Fungsi untuk konversi Blob URL ke Data URL
+async function blobToDataUrl(blobUrl) {
+  try {
+    const response = await fetch(blobUrl);
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error('Error converting blob:', error);
+    return null;
+  }
+}
+
 // Upload Foto
 photoFolder.addEventListener('change', (e) => {
   const files = e.target.files;
@@ -420,9 +436,15 @@ function closeModal() {
 }
 
 // Download PDF
-function downloadPDF(item, foto) {
+async function downloadPDF(item, foto) {
 
   const element = document.createElement('div');
+
+  // Konversi foto ke data URL jika masih blob URL
+  let imageSrc = foto;
+  if (foto.startsWith('blob:')) {
+    imageSrc = await blobToDataUrl(foto) || foto;
+  }
 
   element.innerHTML = `
 
@@ -430,7 +452,7 @@ function downloadPDF(item, foto) {
 
       <div style="text-align:center;">
 
-        <img src="${foto}" style="width:150px;height:150px;border-radius:50%;object-fit:cover;border:5px solid orange;">
+        <img src="${imageSrc}" style="width:150px;height:150px;border-radius:50%;object-fit:cover;border:5px solid orange;">
 
         <h1>${item.nama}</h1>
         <p>${item.kelas || ''}</p>
