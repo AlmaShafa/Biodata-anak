@@ -384,9 +384,33 @@ let biodata = JSON.parse(localStorage.getItem("biodata-anak")) || [];
 let photoMap = {};
 
 const cardContainer = document.getElementById("cardContainer");
+const loadingGrid = document.getElementById("loadingGrid");
+const detailModal = document.getElementById("detailModal");
+const modalContent = document.getElementById("modalContent");
+const searchInput = document.getElementById("searchInput");
+const filterKelas = document.getElementById("filterKelas");
+const filterJK = document.getElementById("filterJK");
+const totalAnak = document.getElementById("totalAnak");
+const totalLaki = document.getElementById("totalLaki");
+const totalPerempuan = document.getElementById("totalPerempuan");
+const totalKelas = document.getElementById("totalKelas");
 
 renderCards(biodata);
 updateStats();
+populateKelas();
+
+
+// ======================
+// Loading Functions
+// ======================
+
+function showLoading(){
+  loadingGrid.classList.remove("hidden");
+}
+
+function hideLoading(){
+  loadingGrid.classList.add("hidden");
+}
 
 
 // ======================
@@ -855,8 +879,6 @@ function populateKelas(){
 
 }
 
-populateKelas();
-
 
 // ======================
 // Statistik
@@ -1004,60 +1026,6 @@ async function saveToFirebase(dataArray){
 
 }
 
-
-// ======================
-// LOAD DATA FIREBASE
-// ======================
-
-async function loadFirebaseData(){
-
-  const snapshot = await firebaseGetDocs(
-    firebaseCollection(db,"biodata_anak")
-  );
-
-  biodata = [];
-
-  snapshot.forEach((doc)=>{
-
-    biodata.push(doc.data());
-
-  });
-
-  renderCards(biodata);
-
-  updateStats();
-
-  populateKelas();
-
-}
-
-loadFirebaseData();
-
-// ======================
-// LOADING
-// ======================
-
-function showLoading(){
-
-  loadingGrid.classList.remove("hidden");
-
-  loadingGrid.innerHTML = "";
-
-  for(let i=0;i<8;i++){
-
-    loadingGrid.innerHTML += `
-      <div class="h-72 rounded-[32px] skeleton"></div>
-    `;
-
-  }
-
-}
-
-function hideLoading(){
-
-  loadingGrid.classList.add("hidden");
-
-}
 </script>
 
 </body>
