@@ -10,10 +10,23 @@ class App {
   /**
    * Initialize app
    */
-  init() {
+  async init() {
+    // Tunggu database siap
+    let retries = 0;
+    while (!dbReady && retries < 10) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      retries++;
+    }
+
+    if (!dbReady) {
+      console.error('Database failed to initialize');
+      showToast('Gagal menginisialisasi database', 'error');
+      return;
+    }
+
     this.setupEventListeners();
-    this.loadInitialData();
-    this.applyDarkMode();
+    await this.loadInitialData();
+    await this.applyDarkMode();
   }
 
   /**
@@ -32,30 +45,45 @@ class App {
     const filterKelas = getElement('filterKelas');
 
     // Excel upload
-    if (uploadExcelBtn && excelFile) {
-      uploadExcelBtn.addEventListener('click', () => excelFile.click());
+    if (uploadExcelBtn) {
+      uploadExcelBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (excelFile) excelFile.click();
+      });
     }
+
     if (excelFile) {
       excelFile.addEventListener('change', (e) => {
-        FileHandler.handleExcelUpload(e.target.files[0]);
+        if (e.target.files && e.target.files[0]) {
+          FileHandler.handleExcelUpload(e.target.files[0]);
+        }
         e.target.value = ''; // Reset input
       });
     }
 
     // Photo upload
-    if (uploadPhotoBtn && photoFolder) {
-      uploadPhotoBtn.addEventListener('click', () => photoFolder.click());
+    if (uploadPhotoBtn) {
+      uploadPhotoBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (photoFolder) photoFolder.click();
+      });
     }
+
     if (photoFolder) {
       photoFolder.addEventListener('change', (e) => {
-        FileHandler.handlePhotoUpload(e.target.files);
+        if (e.target.files && e.target.files.length) {
+          FileHandler.handlePhotoUpload(e.target.files);
+        }
         e.target.value = ''; // Reset input
       });
     }
 
     // Download template
     if (downloadTemplateBtn) {
-      downloadTemplateBtn.addEventListener('click', () => {
+      downloadTemplateBtn.addEventListener('click', (e) => {
+        e.preventDefault();
         FileHandler.downloadTemplate();
       });
     }
@@ -72,15 +100,15 @@ class App {
 
     // Search with debounce
     if (searchInput) {
-      searchInput.addEventListener('input', debounce(() => {
-        Renderer.renderCards();
+      searchInput.addEventListener('input', debounce(async () => {
+        await Renderer.renderCards();
       }, 300));
     }
 
     // Filter
     if (filterKelas) {
-      filterKelas.addEventListener('change', () => {
-        Renderer.renderCards();
+      filterKelas.addEventListener('change', async () => {
+        await Renderer.renderCards();
       });
     }
 
@@ -96,16 +124,16 @@ class App {
   }
 
   /**
-   * Load initial data from storage
+   * Load initial data from IndexedDB
    */
-  loadInitialData() {
+  async loadInitialData() {
     try {
-      const saved = Storage.getBiodata();
-      if (saved && saved.length > 0) {
-        FileHandler.biodata = saved;
-        Renderer.renderCards();
-        Renderer.renderStatistics();
-        Renderer.renderFilter();
+      const biodata = await Storage.getBiodata();
+      if (biodata && biodata.length > 0) {
+        FileHandler.biodata = biodata;
+        await Renderer.renderCards();
+        await Renderer.renderStatistics();
+        await Renderer.renderFilter();
       }
     } catch (error) {
       console.error('Error loading initial data:', error);
@@ -116,21 +144,30 @@ class App {
   /**
    * Toggle dark mode
    */
-  toggleDarkMode() {
-    const isDarkMode = Storage.getDarkMode();
-    const newDarkMode = !isDarkMode;
-    
-    document.body.classList.toggle('dark-mode', newDarkMode);
-    Storage.setDarkMode(newDarkMode);
-    showToast(newDarkMode ? 'Dark Mode ON' : 'Dark Mode OFF');
+  async toggleDarkMode() {
+    try {
+      const isDarkMode = await Storage.getDarkMode();
+      const newDarkMode = !isDarkMode;
+
+      document.body.classList.toggle('dark-mode', newDarkMode);
+      await Storage.setDarkMode(newDarkMode);
+      showToast(newDarkMode ? 'Dark Mode ON' : 'Dark Mode OFF');
+    } catch (error) {
+      console.error('Error toggling dark mode:', error);
+    }
   }
 
   /**
    * Apply dark mode on load
    */
-  applyDarkMode() {
-    if (Storage.getDarkMode()) {
-      document.body.classList.add('dark-mode');
+  async applyDarkMode() {
+    try {
+      const isDarkMode = await Storage.getDarkMode();
+      if (isDarkMode) {
+        document.body.classList.add('dark-mode');
+      }
+    } catch (error) {
+      console.error('Error applying dark mode:', error);
     }
   }
 }
