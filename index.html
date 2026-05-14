@@ -423,44 +423,130 @@ photoMap = JSON.parse(localStorage.getItem("photoMap")) || {};
 
 
 // ======================
-// Upload Excel
+// UPLOAD EXCEL FIX
 // ======================
 
-document.getElementById("excelFile")
-.addEventListener("change", handleExcel);
+const excelInput = document.getElementById("excelFile");
 
-function handleExcel(e){
+excelInput.addEventListener("change", async function(e){
 
   const file = e.target.files[0];
 
-  const reader = new FileReader();
+  if(!file){
 
-  reader.onload = function(evt){
+    alert("File tidak ditemukan");
+    return;
 
-    const data = new Uint8Array(evt.target.result);
+  }
 
-    const workbook = XLSX.read(data, {type:'array'});
+  try{
 
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    showLoading();
 
-    const json = XLSX.utils.sheet_to_json(sheet);
+    const data = await file.arrayBuffer();
 
-    biodata = json;
+    const workbook = XLSX.read(data,{
+      type:"array"
+    });
 
-    localStorage.setItem("biodata-anak", JSON.stringify(biodata));
-    saveToFirebase(biodata);
+    const firstSheet =
+      workbook.SheetNames[0];
 
-    populateKelas();
+    const worksheet =
+      workbook.Sheets[firstSheet];
+
+    const jsonData =
+      XLSX.utils.sheet_to_json(worksheet,{
+        defval:""
+      });
+
+    if(jsonData.length === 0){
+
+      alert("Data Excel kosong");
+      hideLoading();
+      return;
+
+    }
+
+    biodata = jsonData.map(item=>({
+
+      nomor_induk:
+        item.nomor_induk ||
+        item["Nomor Induk"] ||
+        "",
+
+      nama:
+        item.nama ||
+        item["Nama"] ||
+        "",
+
+      ttl:
+        item.ttl ||
+        item["TTL"] ||
+        "",
+
+      jk:
+        item.jk ||
+        item["JK"] ||
+        "",
+
+      alamat:
+        item.alamat ||
+        item["Alamat"] ||
+        "",
+
+      wali:
+        item.wali ||
+        item["Wali"] ||
+        "",
+
+      kelas:
+        item.kelas ||
+        item["Kelas"] ||
+        "",
+
+      hafalan:
+        item.hafalan ||
+        item["Hafalan"] ||
+        ""
+
+    }));
+
+
+    localStorage.setItem(
+      "biodata-anak",
+      JSON.stringify(biodata)
+    );
+
+    if(typeof saveToFirebase === "function"){
+
+      await saveToFirebase(biodata);
+
+    }
 
     renderCards(biodata);
 
     updateStats();
 
+    populateKelas();
+
+    hideLoading();
+
+    alert("Upload Excel berhasil");
+
+  }catch(error){
+
+    console.error(error);
+
+    hideLoading();
+
+    alert(
+      "Gagal membaca file Excel"
+    );
+
   }
 
-  reader.readAsArrayBuffer(file);
-
-}
+});
 
 
 // ======================
@@ -946,6 +1032,32 @@ async function loadFirebaseData(){
 }
 
 loadFirebaseData();
+
+// ======================
+// LOADING
+// ======================
+
+function showLoading(){
+
+  loadingGrid.classList.remove("hidden");
+
+  loadingGrid.innerHTML = "";
+
+  for(let i=0;i<8;i++){
+
+    loadingGrid.innerHTML += `
+      <div class="h-72 rounded-[32px] skeleton"></div>
+    `;
+
+  }
+
+}
+
+function hideLoading(){
+
+  loadingGrid.classList.add("hidden");
+
+}
 </script>
 
 </body>
